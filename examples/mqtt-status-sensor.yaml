@@ -1,0 +1,12 @@
+mqtt:
+  sensor:
+    - name: NTP32S3 Status
+      unique_id: ntp32s3_status
+      state_topic: ntpserver/gps/status
+      value_template: >-
+        {% if value_json.time_valid %}
+          locked
+        {% else %}
+          waiting
+        {% endif %}
+      json_attributes_topic: ntpserver/gps/status
