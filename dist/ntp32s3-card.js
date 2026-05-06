@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.2.0";
+const CARD_VERSION = "0.3.0";
 
 const DEFAULT_COLORS = {
   gps: "#2f8cff",
@@ -378,10 +378,7 @@ function skySvg(status, mini = false) {
 
 class NtpBaseCard extends HTMLElement {
   setConfig(config) {
-    if (!config.status_entity && !config.entities) {
-      throw new Error("Set status_entity or entities.");
-    }
-    this.config = config;
+    this.config = { ...(this.constructor.getStubConfig?.() || {}), ...(config || {}) };
     if (!this.shadowRoot) {
       this.attachShadow({ mode: "open" });
     }
@@ -419,6 +416,14 @@ class NtpBaseCard extends HTMLElement {
 }
 
 class NtpDashboardCard extends NtpBaseCard {
+  static getStubConfig() {
+    return { name: "NTP Server" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("ntp32s3-card-editor");
+  }
+
   render() {
     if (!this.shadowRoot || !this._hass || !this.config) return;
     const status = getStatus(this._hass, this.config);
@@ -462,6 +467,14 @@ class NtpDashboardCard extends NtpBaseCard {
 }
 
 class NtpSkyCard extends NtpBaseCard {
+  static getStubConfig() {
+    return { name: "NTP Server" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("ntp32s3-card-editor");
+  }
+
   getCardSize() {
     return 5;
   }
@@ -491,6 +504,14 @@ class NtpSkyCard extends NtpBaseCard {
 }
 
 class NtpSignalCard extends NtpBaseCard {
+  static getStubConfig() {
+    return { name: "NTP Server" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("ntp32s3-card-editor");
+  }
+
   getCardSize() {
     return 4;
   }
@@ -528,27 +549,102 @@ class NtpSignalCard extends NtpBaseCard {
   }
 }
 
-customElements.define("ntp32s3-dashboard-card", NtpDashboardCard);
-customElements.define("ntp32s3-sky-card", NtpSkyCard);
-customElements.define("ntp32s3-signal-card", NtpSignalCard);
+class NtpCardEditor extends HTMLElement {
+  setConfig(config) {
+    this.config = config || {};
+    this.render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this.render();
+  }
+
+  render() {
+    if (!this.shadowRoot) {
+      this.attachShadow({ mode: "open" });
+    }
+    const statusEntity = this.config?.status_entity || "";
+    const name = this.config?.name || "";
+    this.shadowRoot.innerHTML = html`
+      <style>
+        .editor { display: grid; gap: 12px; }
+        label { display: grid; gap: 6px; font-weight: 600; }
+        input { font: inherit; padding: 9px 10px; border-radius: 6px; border: 1px solid var(--divider-color); background: var(--card-background-color); color: var(--primary-text-color); }
+        .hint { color: var(--secondary-text-color); font-size: 12px; line-height: 1.35; }
+      </style>
+      <div class="editor">
+        <label>
+          Name
+          <input data-field="name" value="${escapeHtml(name)}" placeholder="NTP Server">
+        </label>
+        <label>
+          Status entity
+          <input data-field="status_entity" value="${escapeHtml(statusEntity)}" placeholder="sensor.ntp32s3_status">
+        </label>
+        <div class="hint">Leave status entity blank to auto-detect sensor.ntp32s3_status from the NTP32S3 integration.</div>
+      </div>
+    `;
+    this.shadowRoot.querySelectorAll("input").forEach((input) => {
+      input.addEventListener("input", (event) => {
+        const target = event.currentTarget;
+        const field = target.dataset.field;
+        const value = target.value.trim();
+        const config = { ...(this.config || {}) };
+        if (value) {
+          config[field] = value;
+        } else {
+          delete config[field];
+        }
+        this.config = config;
+        this.dispatchEvent(new CustomEvent("config-changed", {
+          detail: { config },
+          bubbles: true,
+          composed: true,
+        }));
+      });
+    });
+  }
+}
+
+if (!customElements.get("ntp32s3-dashboard-card")) {
+  customElements.define("ntp32s3-dashboard-card", NtpDashboardCard);
+}
+if (!customElements.get("ntp32s3-sky-card")) {
+  customElements.define("ntp32s3-sky-card", NtpSkyCard);
+}
+if (!customElements.get("ntp32s3-signal-card")) {
+  customElements.define("ntp32s3-signal-card", NtpSignalCard);
+}
+if (!customElements.get("ntp32s3-card-editor")) {
+  customElements.define("ntp32s3-card-editor", NtpCardEditor);
+}
 
 window.customCards = window.customCards || [];
-window.customCards.push(
+const ntp32s3Cards = [
   {
     type: "ntp32s3-dashboard-card",
     name: "NTP32S3 Dashboard Card",
+    preview: true,
     description: "iOS dark glass GNSS/NTP dashboard card.",
   },
   {
     type: "ntp32s3-sky-card",
     name: "NTP32S3 Sky View Card",
+    preview: true,
     description: "Satellite sky plot for NTP32S3 status data.",
   },
   {
     type: "ntp32s3-signal-card",
     name: "NTP32S3 Signal Card",
+    preview: true,
     description: "Satellite signal strength bars for NTP32S3 status data.",
   },
-);
+];
+for (const card of ntp32s3Cards) {
+  if (!window.customCards.some((existing) => existing.type === card.type)) {
+    window.customCards.push(card);
+  }
+}
 
 console.info(`%c NTP32S3 Cards %c ${CARD_VERSION} `, "color: #64d2ff; font-weight: 700;", "color: #fff; background: #111827; border-radius: 4px;");

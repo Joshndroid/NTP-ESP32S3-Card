@@ -50,6 +50,32 @@ status_entity: sensor.ntp32s3_status
 name: NTP Server
 ```
 
+## Troubleshooting
+
+After installing or updating, hard-refresh Home Assistant. In the browser console, this should return `true`:
+
+```js
+customElements.get("ntp32s3-dashboard-card") !== undefined
+```
+
+And this should include the three NTP32S3 cards:
+
+```js
+window.customCards?.filter((card) => card.type?.startsWith("ntp32s3"))
+```
+
+If those checks fail, Home Assistant has not loaded the card resource. Confirm the Dashboard resource points to:
+
+```text
+/hacsfiles/NTP32S3-Card/NTP32S3-Card.js
+```
+
+or, for a manual install:
+
+```text
+/local/community/NTP32S3-Card/NTP32S3-Card.js
+```
+
 ```yaml
 type: custom:ntp32s3-sky-card
 status_entity: sensor.ntp32s3_status
