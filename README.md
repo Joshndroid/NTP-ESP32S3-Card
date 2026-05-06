@@ -115,6 +115,7 @@ entities:
   hdop: sensor.ntp32s3_hdop
   altitude: sensor.ntp32s3_altitude
   ntp_packets: sensor.ntp32s3_ntp_packets
+  ntp_packets_today: sensor.ntp32s3_ntp_packets_today
   ntp_time: sensor.ntp32s3_ntp_time
   time_valid: binary_sensor.ntp32s3_gps_time_valid
   pps_active: binary_sensor.ntp32s3_pps_active

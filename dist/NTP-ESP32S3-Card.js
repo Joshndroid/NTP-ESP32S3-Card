@@ -215,6 +215,7 @@ function autoEntities(hass, config) {
     hdop: configured.hdop || findEntity(hass, ["sensor.ntp32s3_hdop"]),
     altitude: configured.altitude || findEntity(hass, ["sensor.ntp32s3_altitude"]),
     ntpPackets: configured.ntp_packets || findEntity(hass, ["sensor.ntp32s3_ntp_packets"]),
+    ntpPacketsToday: configured.ntp_packets_today || findEntity(hass, ["sensor.ntp32s3_ntp_packets_today"]),
     ntpTime: configured.ntp_time || findEntity(hass, ["sensor.ntp32s3_ntp_time"]),
     unixTime: configured.unix_time || findEntity(hass, ["sensor.ntp32s3_unix_time"]),
     timeValid: configured.time_valid || findEntity(hass, ["binary_sensor.ntp32s3_gps_time_valid"]),
@@ -273,6 +274,53 @@ function formatDate(value) {
   return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
+function formatState(value, onText = "Active", offText = "Inactive") {
+  if (value === undefined || value === null || value === "") return "-";
+  return boolish(value) ? onText : offText;
+}
+
+function localDayKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function ntpPacketsToday(status) {
+  const total = numberish(status.ntpPackets);
+  if (total === undefined) return undefined;
+  let storage;
+  try {
+    storage = window.localStorage;
+  } catch (_err) {
+    storage = undefined;
+  }
+  if (!storage) return total;
+
+  const day = localDayKey();
+  const storageKey = `ntp32s3:packets-today:${status.statusEntity || status.name || "default"}`;
+  let stored;
+  try {
+    stored = JSON.parse(storage.getItem(storageKey) || "{}");
+  } catch (_err) {
+    stored = {};
+  }
+
+  let baseline = numberish(stored.baseline);
+  const lastTotal = numberish(stored.lastTotal);
+  if (stored.day !== day) baseline = lastTotal ?? total;
+  if (baseline === undefined || total < baseline) baseline = 0;
+
+  const today = Math.max(0, total - baseline);
+  try {
+    storage.setItem(storageKey, JSON.stringify({ day, baseline, lastTotal: total }));
+  } catch (_err) {
+    // Ignore storage failures; the displayed total is still useful.
+  }
+  return today;
+}
+
 function normalizeConstellation(value) {
   const text = String(value || "unknown").toLowerCase();
   if (text.includes("gps") || text === "1") return "gps";
@@ -316,6 +364,7 @@ function getStatus(hass, config) {
     ppsActive: field("pps_active") ?? fromEntity("ppsActive"),
     mqttConnected: field("mqtt_connected") ?? fromEntity("mqttConnected"),
     ntpPackets: field("ntp_packets") ?? fromEntity("ntpPackets"),
+    ntpPacketsToday: field("ntp_packets_today") ?? fromEntity("ntpPacketsToday"),
     satellitesUsed: field("satellites_used", "satellites") ?? fromEntity("satellites"),
     satelliteDetailCount: field("satellite_detail_count") ?? fromEntity("satelliteDetailCount"),
     satellitesInView: field("satellites_in_view_count", "satellites_visible") ?? fromEntity("satellites_visible"),
@@ -590,6 +639,7 @@ class NtpRawCard extends NtpBaseCard {
     const status = getStatus(this._hass, this.config);
     const fixTime = status.ntpTime ?? status.unixTime;
     const sats = numberish(status.satellitesUsed) ?? status.satellites.length;
+    const packetsToday = status.ntpPacketsToday ?? ntpPacketsToday(status);
     this.shadowRoot.innerHTML = html`
       <style>${BASE_STYLE}
         .raw-section { margin-top: 14px; }
@@ -625,8 +675,8 @@ class NtpRawCard extends NtpBaseCard {
           <div class="raw-section">
             <div class="raw-grid triple">
               <div class="raw-item"><div class="raw-label">Alt</div><div class="raw-value">${formatNumber(status.altitude, 1)} m</div><div class="raw-note">metric</div></div>
-              <div class="raw-item"><div class="raw-label">Speed</div><div class="raw-value">${formatNumber(status.speed, 1)}</div><div class="raw-note">km/h</div></div>
-              <div class="raw-item"><div class="raw-label">Course</div><div class="raw-value">${formatDegree(status.course)}</div><div class="raw-note">heading</div></div>
+              <div class="raw-item"><div class="raw-label">NTP Today</div><div class="raw-value">${formatNumber(packetsToday, 0)}</div><div class="raw-note">packets</div></div>
+              <div class="raw-item"><div class="raw-label">PPS</div><div class="raw-value">${formatState(status.ppsActive)}</div><div class="raw-note">precision pulse</div></div>
               <div class="raw-item"><div class="raw-label">HDOP</div><div class="raw-value">${formatNumber(status.hdop, 2)}</div><div class="raw-note">dilution</div></div>
               <div class="raw-item"><div class="raw-label">Sats</div><div class="raw-value">${formatNumber(sats, 0)}</div><div class="raw-note">${formatNumber(status.satelliteDetailCount ?? status.satellites.length, 0)} detailed</div></div>
               <div class="raw-item"><div class="raw-label">Fix</div><div class="raw-value">${formatTime(fixTime)}</div><div class="raw-note">${formatDate(fixTime)}</div></div>
