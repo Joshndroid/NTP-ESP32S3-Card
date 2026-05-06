@@ -19,17 +19,17 @@ Add this repository to HACS as a custom repository with category `Dashboard`.
 The card bundle is:
 
 ```text
-dist/NTP32S3-Card.js
+dist/NTP-ESP32S3-Card.js
 ```
 
 HACS auto-detects dashboard plugins by looking for JavaScript files in `dist/`. This repository intentionally does not override `filename` in `hacs.json`.
 
 ## Manual Resource
 
-If installing manually, copy `dist/NTP32S3-Card.js` into Home Assistant under `www/community/NTP32S3-Card/`, then add this Lovelace resource:
+If installing manually, copy `dist/NTP-ESP32S3-Card.js` into Home Assistant under `www/community/NTP-ESP32S3-Card/`, then add this Lovelace resource:
 
 ```yaml
-url: /local/community/NTP32S3-Card/NTP32S3-Card.js
+url: /local/community/NTP-ESP32S3-Card/NTP-ESP32S3-Card.js
 type: module
 ```
 
@@ -69,13 +69,13 @@ window.customCards?.filter((card) => card.type?.startsWith("ntp32s3"))
 If those checks fail, Home Assistant has not loaded the card resource. Confirm the Dashboard resource points to:
 
 ```text
-/hacsfiles/NTP32S3-Card/NTP32S3-Card.js
+/hacsfiles/NTP-ESP32S3-Card/NTP-ESP32S3-Card.js
 ```
 
 or, for a manual install:
 
 ```text
-/local/community/NTP32S3-Card/NTP32S3-Card.js
+/local/community/NTP-ESP32S3-Card/NTP-ESP32S3-Card.js
 ```
 
 ```yaml
