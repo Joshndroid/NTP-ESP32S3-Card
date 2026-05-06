@@ -8,3 +8,6 @@ cards:
 
   - type: custom:ntp32s3-signal-card
     name: NTP Server
+
+  - type: custom:ntp32s3-raw-card
+    name: NTP Server

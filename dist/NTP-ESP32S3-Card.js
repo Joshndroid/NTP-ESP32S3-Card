@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.3.0";
+const CARD_VERSION = "0.4.0";
 
 const DEFAULT_COLORS = {
   gps: "#2f8cff",
@@ -21,9 +21,9 @@ const CONSTELLATION_LABELS = {
 const BASE_STYLE = `
   :host {
     display: block;
-    --ntp-glass-bg: var(--ha-card-background, rgba(18, 18, 22, 0.62));
-    --ntp-glass-border: rgba(255, 255, 255, 0.13);
-    --ntp-glass-border-soft: rgba(255, 255, 255, 0.08);
+    --ntp-glass-bg: var(--ha-card-background, var(--card-background-color, #111114));
+    --ntp-glass-border: var(--ha-card-border-color, var(--divider-color, rgba(255, 255, 255, 0.13)));
+    --ntp-glass-border-soft: color-mix(in srgb, var(--ntp-glass-border) 62%, transparent);
     --ntp-text: var(--primary-text-color, #f5f7fb);
     --ntp-muted: var(--secondary-text-color, rgba(235, 240, 255, 0.62));
     --ntp-dim: rgba(235, 240, 255, 0.38);
@@ -36,26 +36,22 @@ const BASE_STYLE = `
     position: relative;
     overflow: hidden;
     color: var(--ntp-text);
-    background:
-      linear-gradient(145deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.025)),
-      var(--ntp-glass-bg);
+    background: var(--ntp-glass-bg);
     border: 1px solid var(--ntp-glass-border);
     border-radius: var(--ha-card-border-radius, 22px);
     box-shadow:
-      0 18px 40px rgba(0, 0, 0, 0.28),
-      inset 0 1px 0 rgba(255, 255, 255, 0.12);
-    backdrop-filter: blur(22px) saturate(1.35);
-    -webkit-backdrop-filter: blur(22px) saturate(1.35);
+      var(--ha-card-box-shadow, 0 10px 26px rgba(0, 0, 0, 0.26)),
+      inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(14px) saturate(1.1);
+    -webkit-backdrop-filter: blur(14px) saturate(1.1);
   }
   ha-card::before {
     content: "";
     position: absolute;
     inset: 0;
     pointer-events: none;
-    background:
-      radial-gradient(circle at 18% 0%, rgba(255,255,255,0.12), transparent 34%),
-      radial-gradient(circle at 100% 18%, rgba(100,210,255,0.12), transparent 32%);
-    opacity: 0.72;
+    background: linear-gradient(180deg, rgba(255,255,255,0.045), transparent 34%);
+    opacity: 0.55;
   }
   .wrap {
     position: relative;
@@ -87,7 +83,7 @@ const BASE_STYLE = `
     gap: 7px;
     white-space: nowrap;
     border: 1px solid var(--ntp-glass-border-soft);
-    background: rgba(255, 255, 255, 0.07);
+    background: color-mix(in srgb, var(--ntp-glass-bg) 82%, var(--ntp-text) 18%);
     color: var(--ntp-muted);
     border-radius: 999px;
     padding: 7px 10px;
@@ -110,9 +106,9 @@ const BASE_STYLE = `
   }
   .metric {
     min-width: 0;
-    border-radius: 16px;
+    border-radius: 12px;
     padding: 11px 12px;
-    background: rgba(255, 255, 255, 0.055);
+    background: color-mix(in srgb, var(--ntp-glass-bg) 88%, var(--ntp-text) 12%);
     border: 1px solid var(--ntp-glass-border-soft);
   }
   .label {
@@ -219,6 +215,8 @@ function autoEntities(hass, config) {
     hdop: configured.hdop || findEntity(hass, ["sensor.ntp32s3_hdop"]),
     altitude: configured.altitude || findEntity(hass, ["sensor.ntp32s3_altitude"]),
     ntpPackets: configured.ntp_packets || findEntity(hass, ["sensor.ntp32s3_ntp_packets"]),
+    ntpTime: configured.ntp_time || findEntity(hass, ["sensor.ntp32s3_ntp_time"]),
+    unixTime: configured.unix_time || findEntity(hass, ["sensor.ntp32s3_unix_time"]),
     timeValid: configured.time_valid || findEntity(hass, ["binary_sensor.ntp32s3_gps_time_valid"]),
     ppsActive: configured.pps_active || findEntity(hass, ["binary_sensor.ntp32s3_pps_active"]),
     mqttConnected: configured.mqtt_connected || findEntity(hass, ["binary_sensor.ntp32s3_mqtt_connected"]),
@@ -252,6 +250,27 @@ function formatCoordinate(value, positive, negative) {
   const parsed = numberish(value);
   if (parsed === undefined) return "-";
   return `${Math.abs(parsed).toFixed(5)} ${parsed >= 0 ? positive : negative}`;
+}
+
+function formatDegree(value) {
+  const parsed = numberish(value);
+  return parsed === undefined ? "-" : `${parsed.toLocaleString(undefined, { maximumFractionDigits: 0 })}\u00b0`;
+}
+
+function formatTime(value) {
+  if (value === undefined || value === null || value === "") return "-";
+  const numeric = numberish(value);
+  const date = numeric !== undefined ? new Date(numeric * 1000) : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function formatDate(value) {
+  if (value === undefined || value === null || value === "") return "";
+  const numeric = numberish(value);
+  const date = numeric !== undefined ? new Date(numeric * 1000) : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 function normalizeConstellation(value) {
@@ -306,7 +325,8 @@ function getStatus(hass, config) {
     longitude: field("longitude", "lon", "lng") ?? fromEntity("longitude"),
     speed: field("speed_kmph", "speed") ?? fromEntity("speed"),
     course: field("course_deg", "course") ?? fromEntity("course"),
-    unixTime: field("unix_time") ?? fromEntity("unix_time"),
+    unixTime: field("unix_time") ?? fromEntity("unixTime"),
+    ntpTime: field("ntp_time_utc", "ntp_time") ?? fromEntity("ntpTime"),
     satellites: normalizeSatellites(satellites),
   };
 }
@@ -452,6 +472,8 @@ class NtpDashboardCard extends NtpBaseCard {
                 <div class="metric"><div class="label">Alt</div><div class="value">${formatNumber(status.altitude, 1)} <span class="unit">m</span></div></div>
                 <div class="metric"><div class="label">HDOP</div><div class="value">${formatNumber(status.hdop, 2)}</div></div>
                 <div class="metric"><div class="label">Sats</div><div class="value">${formatNumber(sats, 0)}</div></div>
+                <div class="metric"><div class="label">NTP</div><div class="value">${formatNumber(status.ntpPackets, 0)}</div></div>
+                <div class="metric"><div class="label">NTP Time</div><div class="value">${formatTime(status.ntpTime ?? status.unixTime)}</div></div>
                 <div class="metric"><div class="label">Detail</div><div class="value">${formatNumber(status.satelliteDetailCount ?? status.satellites.length, 0)}</div></div>
               </div>
               <div class="footer">
@@ -520,6 +542,7 @@ class NtpSignalCard extends NtpBaseCard {
     if (!this.shadowRoot || !this._hass || !this.config) return;
     const status = getStatus(this._hass, this.config);
     const sats = [...status.satellites].sort((a, b) => (b.snr ?? 0) - (a.snr ?? 0)).slice(0, this.config.max_satellites || 14);
+    const columnCount = Math.max(1, sats.length);
     const bars = sats.map((sat) => {
       const snr = Math.max(0, Math.min(60, sat.snr ?? 0));
       return html`<div class="bar-cell">
@@ -530,7 +553,7 @@ class NtpSignalCard extends NtpBaseCard {
     }).join("");
     this.shadowRoot.innerHTML = html`
       <style>${BASE_STYLE}
-        .chart { display:grid; grid-template-columns: repeat(auto-fit, minmax(34px, 1fr)); gap:10px; align-items:end; height:190px; padding-top:6px; }
+        .chart { display:grid; grid-template-columns: repeat(var(--sat-columns), minmax(16px, 1fr)); gap: clamp(3px, 1.4vw, 10px); align-items:end; height:190px; padding-top:6px; }
         .bar-cell { display:grid; grid-template-rows: 1fr auto auto; gap:5px; min-width:0; height:100%; text-align:center; }
         .bar-track { position:relative; align-self:end; height:132px; border-radius: 10px; overflow:hidden; background: rgba(255,255,255,.055); border:1px solid var(--ntp-glass-border-soft); }
         .bar { position:absolute; left:0; right:0; bottom:0; border-radius: 9px 9px 0 0; box-shadow: 0 -6px 20px rgba(255,255,255,.12); }
@@ -543,7 +566,75 @@ class NtpSignalCard extends NtpBaseCard {
       <ha-card>
         <div class="wrap">
           ${this.header(status, "Signal Strength")}
-          ${sats.length ? html`<div class="chart">${bars}</div>${legend(status)}` : html`<div class="empty">Waiting for satellite signal detail. Add SNR/CN0 values to the status entity satellite array to populate the graph.</div>${legend(status)}`}
+          ${sats.length ? html`<div class="chart" style="--sat-columns:${columnCount}">${bars}</div>${legend(status)}` : html`<div class="empty">Waiting for satellite signal detail. Add SNR/CN0 values to the status entity satellite array to populate the graph.</div>${legend(status)}`}
+        </div>
+      </ha-card>`;
+  }
+}
+
+class NtpRawCard extends NtpBaseCard {
+  static getStubConfig() {
+    return { name: "NTP Server" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("ntp32s3-card-editor");
+  }
+
+  getCardSize() {
+    return 5;
+  }
+
+  render() {
+    if (!this.shadowRoot || !this._hass || !this.config) return;
+    const status = getStatus(this._hass, this.config);
+    const fixTime = status.ntpTime ?? status.unixTime;
+    const sats = numberish(status.satellitesUsed) ?? status.satellites.length;
+    this.shadowRoot.innerHTML = html`
+      <style>${BASE_STYLE}
+        .raw-section { margin-top: 14px; }
+        .raw-title {
+          margin: 0 0 10px;
+          color: var(--ntp-muted);
+          font-size: 11px;
+          font-weight: 850;
+          text-transform: uppercase;
+          letter-spacing: .12em;
+        }
+        .raw-grid { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:14px 18px; }
+        .raw-grid.triple { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .raw-item { min-width:0; }
+        .raw-label { color: var(--ntp-muted); font-size: 12px; font-weight: 700; }
+        .raw-value { margin-top: 3px; color: var(--ntp-text); font-size: 18px; line-height: 1.15; font-weight: 760; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .raw-note { margin-top: 3px; color: var(--ntp-dim); font-size: 11px; font-weight: 650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        @media (max-width: 460px) {
+          .raw-grid, .raw-grid.triple { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .raw-value { font-size: 16px; }
+        }
+      </style>
+      <ha-card>
+        <div class="wrap">
+          ${this.header(status, "Raw Data")}
+          <div class="raw-section">
+            <div class="raw-title">Position</div>
+            <div class="raw-grid">
+              <div class="raw-item"><div class="raw-label">Lat</div><div class="raw-value">${formatCoordinate(status.latitude, "N", "S")}</div></div>
+              <div class="raw-item"><div class="raw-label">Lon</div><div class="raw-value">${formatCoordinate(status.longitude, "E", "W")}</div></div>
+            </div>
+          </div>
+          <div class="raw-section">
+            <div class="raw-grid triple">
+              <div class="raw-item"><div class="raw-label">Alt</div><div class="raw-value">${formatNumber(status.altitude, 1)} m</div><div class="raw-note">metric</div></div>
+              <div class="raw-item"><div class="raw-label">Speed</div><div class="raw-value">${formatNumber(status.speed, 1)}</div><div class="raw-note">km/h</div></div>
+              <div class="raw-item"><div class="raw-label">Course</div><div class="raw-value">${formatDegree(status.course)}</div><div class="raw-note">heading</div></div>
+              <div class="raw-item"><div class="raw-label">HDOP</div><div class="raw-value">${formatNumber(status.hdop, 2)}</div><div class="raw-note">dilution</div></div>
+              <div class="raw-item"><div class="raw-label">Sats</div><div class="raw-value">${formatNumber(sats, 0)}</div><div class="raw-note">${formatNumber(status.satelliteDetailCount ?? status.satellites.length, 0)} detailed</div></div>
+              <div class="raw-item"><div class="raw-label">Fix</div><div class="raw-value">${formatTime(fixTime)}</div><div class="raw-note">${formatDate(fixTime)}</div></div>
+              <div class="raw-item"><div class="raw-label">NTP Packets</div><div class="raw-value">${formatNumber(status.ntpPackets, 0)}</div><div class="raw-note">served</div></div>
+              <div class="raw-item"><div class="raw-label">NTP Time</div><div class="raw-value">${formatTime(fixTime)}</div><div class="raw-note">from NTP</div></div>
+              <div class="raw-item"><div class="raw-label">Unix</div><div class="raw-value">${formatNumber(status.unixTime, 0)}</div><div class="raw-note">seconds</div></div>
+            </div>
+          </div>
         </div>
       </ha-card>`;
   }
@@ -616,6 +707,9 @@ if (!customElements.get("ntp32s3-sky-card")) {
 if (!customElements.get("ntp32s3-signal-card")) {
   customElements.define("ntp32s3-signal-card", NtpSignalCard);
 }
+if (!customElements.get("ntp32s3-raw-card")) {
+  customElements.define("ntp32s3-raw-card", NtpRawCard);
+}
 if (!customElements.get("ntp32s3-card-editor")) {
   customElements.define("ntp32s3-card-editor", NtpCardEditor);
 }
@@ -626,7 +720,7 @@ const ntp32s3Cards = [
     type: "ntp32s3-dashboard-card",
     name: "NTP32S3 Dashboard Card",
     preview: true,
-    description: "iOS dark glass GNSS/NTP dashboard card.",
+    description: "Theme-aware GNSS/NTP dashboard card.",
   },
   {
     type: "ntp32s3-sky-card",
@@ -639,6 +733,12 @@ const ntp32s3Cards = [
     name: "NTP32S3 Signal Card",
     preview: true,
     description: "Satellite signal strength bars for NTP32S3 status data.",
+  },
+  {
+    type: "ntp32s3-raw-card",
+    name: "NTP32S3 Raw Data Card",
+    preview: true,
+    description: "Raw-ish GNSS/NTP values laid out like a receiver dashboard.",
   },
 ];
 for (const card of ntp32s3Cards) {

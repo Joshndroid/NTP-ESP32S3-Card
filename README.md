@@ -1,8 +1,8 @@
 # NTP32S3 Cards
 
-Three HACS-compatible Lovelace cards for the ESP32-S3 GPS NTP server.
+Four HACS-compatible Lovelace cards for the ESP32-S3 GPS NTP server.
 
-The cards use a dark translucent glass style intended to sit nicely alongside the iOS Dark Glass Home Assistant theme.
+The cards use Home Assistant card/theme variables with a restrained dark glass treatment.
 
 ## Cards
 
@@ -11,6 +11,7 @@ The cards use a dark translucent glass style intended to sit nicely alongside th
 | `ntp32s3-dashboard-card` | Compact GNSS/NTP overview inspired by mobile GPS dashboards |
 | `ntp32s3-sky-card` | Satellite sky plot |
 | `ntp32s3-signal-card` | Satellite signal strength chart |
+| `ntp32s3-raw-card` | Raw-ish GNSS/NTP values including fix time and NTP packets |
 
 ## HACS
 
@@ -60,7 +61,7 @@ After installing or updating, hard-refresh Home Assistant. In the browser consol
 customElements.get("ntp32s3-dashboard-card") !== undefined
 ```
 
-And this should include the three NTP32S3 cards:
+And this should include the four NTP32S3 cards:
 
 ```js
 window.customCards?.filter((card) => card.type?.startsWith("ntp32s3"))
@@ -90,12 +91,18 @@ status_entity: sensor.ntp32s3_status
 name: NTP Server
 ```
 
+```yaml
+type: custom:ntp32s3-raw-card
+status_entity: sensor.ntp32s3_status
+name: NTP Server
+```
+
 The `examples/` folder includes:
 
 | File | Purpose |
 | --- | --- |
 | `mqtt-status-sensor.yaml` | Optional fallback if you use MQTT instead of the NTP32S3 integration |
-| `three-card-stack.yaml` | Adds all three cards as a vertical stack |
+| `three-card-stack.yaml` | Adds the dashboard, sky, signal, and raw cards as a vertical stack |
 
 You can also map individual entities:
 
@@ -108,6 +115,7 @@ entities:
   hdop: sensor.ntp32s3_hdop
   altitude: sensor.ntp32s3_altitude
   ntp_packets: sensor.ntp32s3_ntp_packets
+  ntp_time: sensor.ntp32s3_ntp_time
   time_valid: binary_sensor.ntp32s3_gps_time_valid
   pps_active: binary_sensor.ntp32s3_pps_active
   mqtt_connected: binary_sensor.ntp32s3_mqtt_connected
