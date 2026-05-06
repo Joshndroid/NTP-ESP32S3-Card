@@ -2,9 +2,12 @@ type: vertical-stack
 cards:
   - type: custom:ntp32s3-dashboard-card
     name: NTP Server
+    status_entity: sensor.ntp32s3_status
 
   - type: custom:ntp32s3-sky-card
     name: NTP Server
+    status_entity: sensor.ntp32s3_status
 
   - type: custom:ntp32s3-signal-card
     name: NTP Server
+    status_entity: sensor.ntp32s3_status

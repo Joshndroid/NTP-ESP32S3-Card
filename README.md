@@ -33,7 +33,16 @@ type: module
 
 ## Basic Configuration
 
-Use a status entity if your MQTT/REST sensor exposes the ESP32 JSON fields as attributes.
+Use the `NTP32S3 Status` sensor created by the NTP32S3 Home Assistant integration, or any status entity that exposes the ESP32 JSON fields as attributes.
+
+If the integration creates the default entity ID `sensor.ntp32s3_status`, the cards can auto-detect it:
+
+```yaml
+type: custom:ntp32s3-dashboard-card
+name: NTP Server
+```
+
+Explicit configuration is still recommended if you rename entities:
 
 ```yaml
 type: custom:ntp32s3-dashboard-card
@@ -57,7 +66,7 @@ The `examples/` folder includes:
 
 | File | Purpose |
 | --- | --- |
-| `mqtt-status-sensor.yaml` | Creates a single MQTT status sensor with JSON attributes from `<base-topic>/status` |
+| `mqtt-status-sensor.yaml` | Optional fallback if you use MQTT instead of the NTP32S3 integration |
 | `three-card-stack.yaml` | Adds all three cards as a vertical stack |
 
 You can also map individual entities:
@@ -66,12 +75,13 @@ You can also map individual entities:
 type: custom:ntp32s3-dashboard-card
 name: NTP Server
 entities:
-  satellites: sensor.gps_satellites
-  hdop: sensor.gps_hdop
-  altitude: sensor.gps_altitude
-  ntp_packets: sensor.ntp_packets_served
-  time_valid: binary_sensor.gps_time_valid
-  pps_active: binary_sensor.gps_pps_active
+  satellites: sensor.ntp32s3_satellites
+  satellite_detail_count: sensor.ntp32s3_satellite_detail_count
+  hdop: sensor.ntp32s3_hdop
+  altitude: sensor.ntp32s3_altitude
+  ntp_packets: sensor.ntp32s3_ntp_packets
+  time_valid: binary_sensor.ntp32s3_gps_time_valid
+  pps_active: binary_sensor.ntp32s3_pps_active
   mqtt_connected: binary_sensor.ntp32s3_mqtt_connected
 ```
 

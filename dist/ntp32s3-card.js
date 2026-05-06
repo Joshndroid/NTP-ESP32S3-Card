@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.1.0";
+const CARD_VERSION = "0.2.0";
 
 const DEFAULT_COLORS = {
   gps: "#2f8cff",
@@ -188,6 +188,48 @@ function entityValue(hass, entityId) {
   return Number.isFinite(numberValue) ? numberValue : state.state;
 }
 
+function findEntity(hass, candidates) {
+  for (const entityId of candidates) {
+    if (entityId && hass.states[entityId]) return entityId;
+  }
+  const states = Object.values(hass.states);
+  const candidateNames = candidates.map((entityId) => entityId?.split(".").pop()).filter(Boolean);
+  const found = states.find((state) => {
+    const uniqueId = String(state.attributes?.unique_id || state.entity_id || "").toLowerCase();
+    const friendly = String(state.attributes?.friendly_name || "").toLowerCase();
+    return candidateNames.some((name) => {
+      const normalized = String(name).toLowerCase();
+      return uniqueId.endsWith(normalized) || friendly.includes(normalized.replaceAll("_", " "));
+    });
+  });
+  return found?.entity_id;
+}
+
+function autoEntities(hass, config) {
+  const configured = config.entities || {};
+  const statusEntity = config.status_entity || findEntity(hass, [
+    "sensor.ntp32s3_status",
+    "sensor.ntp_server_status",
+    "sensor.esp32_s3_ntp_server_status",
+  ]);
+  return {
+    status: statusEntity,
+    satellites: configured.satellites || findEntity(hass, ["sensor.ntp32s3_satellites"]),
+    satelliteDetailCount: configured.satellite_detail_count || findEntity(hass, ["sensor.ntp32s3_satellite_detail_count"]),
+    hdop: configured.hdop || findEntity(hass, ["sensor.ntp32s3_hdop"]),
+    altitude: configured.altitude || findEntity(hass, ["sensor.ntp32s3_altitude"]),
+    ntpPackets: configured.ntp_packets || findEntity(hass, ["sensor.ntp32s3_ntp_packets"]),
+    timeValid: configured.time_valid || findEntity(hass, ["binary_sensor.ntp32s3_gps_time_valid"]),
+    ppsActive: configured.pps_active || findEntity(hass, ["binary_sensor.ntp32s3_pps_active"]),
+    mqttConnected: configured.mqtt_connected || findEntity(hass, ["binary_sensor.ntp32s3_mqtt_connected"]),
+    ip: configured.ip,
+    latitude: configured.latitude,
+    longitude: configured.longitude,
+    speed: configured.speed,
+    course: configured.course,
+  };
+}
+
 function boolish(value) {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value > 0;
@@ -234,10 +276,10 @@ function parseMaybeJson(value) {
 }
 
 function getStatus(hass, config) {
-  const statusState = config.status_entity ? hass.states[config.status_entity] : undefined;
+  const entities = autoEntities(hass, config);
+  const statusState = entities.status ? hass.states[entities.status] : undefined;
   const parsedState = parseMaybeJson(statusState?.state);
   const attrs = { ...(statusState?.attributes || {}), ...(parsedState && !Array.isArray(parsedState) ? parsedState : {}) };
-  const entities = config.entities || {};
   const field = (...names) => {
     for (const name of names) {
       if (attrs[name] !== undefined) return attrs[name];
@@ -248,13 +290,15 @@ function getStatus(hass, config) {
   const satellites = field("satellite_detail", "satellites_detail", "satellites_in_view", "satellites_view", "satellite_data");
   return {
     raw: attrs,
+    statusEntity: entities.status,
     name: config.name || field("device_name", "friendly_name") || statusState?.attributes?.friendly_name || "NTP32S3",
     ip: field("ip", "ip_address") || fromEntity("ip"),
-    timeValid: field("time_valid") ?? fromEntity("time_valid"),
-    ppsActive: field("pps_active") ?? fromEntity("pps_active"),
-    mqttConnected: field("mqtt_connected") ?? fromEntity("mqtt_connected"),
-    ntpPackets: field("ntp_packets") ?? fromEntity("ntp_packets"),
+    timeValid: field("time_valid") ?? fromEntity("timeValid"),
+    ppsActive: field("pps_active") ?? fromEntity("ppsActive"),
+    mqttConnected: field("mqtt_connected") ?? fromEntity("mqttConnected"),
+    ntpPackets: field("ntp_packets") ?? fromEntity("ntpPackets"),
     satellitesUsed: field("satellites_used", "satellites") ?? fromEntity("satellites"),
+    satelliteDetailCount: field("satellite_detail_count") ?? fromEntity("satelliteDetailCount"),
     satellitesInView: field("satellites_in_view_count", "satellites_visible") ?? fromEntity("satellites_visible"),
     hdop: field("hdop") ?? fromEntity("hdop"),
     altitude: field("altitude_m", "altitude") ?? fromEntity("altitude"),
@@ -353,6 +397,15 @@ class NtpBaseCard extends HTMLElement {
   }
 
   header(status, subtitle) {
+    if (!status.statusEntity && !this.config?.status_entity) {
+      return html`<div class="header">
+        <div>
+          <div class="title">${escapeHtml(this.config?.name || "NTP32S3")}</div>
+          <div class="subtitle">Waiting for NTP32S3 Status entity</div>
+        </div>
+        <div class="pill"><span class="dot"></span>No entity</div>
+      </div>`;
+    }
     const valid = boolish(status.timeValid);
     const cls = valid ? "ok" : boolish(status.ppsActive) ? "warn" : "";
     return html`<div class="header">
@@ -394,7 +447,7 @@ class NtpDashboardCard extends NtpBaseCard {
                 <div class="metric"><div class="label">Alt</div><div class="value">${formatNumber(status.altitude, 1)} <span class="unit">m</span></div></div>
                 <div class="metric"><div class="label">HDOP</div><div class="value">${formatNumber(status.hdop, 2)}</div></div>
                 <div class="metric"><div class="label">Sats</div><div class="value">${formatNumber(sats, 0)}</div></div>
-                <div class="metric"><div class="label">NTP</div><div class="value">${formatNumber(status.ntpPackets, 0)}</div></div>
+                <div class="metric"><div class="label">Detail</div><div class="value">${formatNumber(status.satelliteDetailCount ?? status.satellites.length, 0)}</div></div>
               </div>
               <div class="footer">
                 <span class="pill ${boolish(status.ppsActive) ? "ok" : ""}"><span class="dot"></span>PPS ${boolish(status.ppsActive) ? "active" : "inactive"}</span>
