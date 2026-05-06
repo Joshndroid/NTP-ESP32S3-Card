@@ -16,11 +16,13 @@ The cards use a dark translucent glass style intended to sit nicely alongside th
 
 Add this repository to HACS as a custom repository with category `Dashboard`.
 
-The HACS entry point is:
+The card bundle is:
 
 ```text
 dist/NTP32S3-Card.js
 ```
+
+HACS auto-detects dashboard plugins by looking for JavaScript files in `dist/`. This repository intentionally does not override `filename` in `hacs.json`.
 
 ## Manual Resource
 
