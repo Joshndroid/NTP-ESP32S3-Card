@@ -14,20 +14,20 @@ The cards use a dark translucent glass style intended to sit nicely alongside th
 
 ## HACS
 
-Add this folder/repository to HACS as a custom frontend repository.
+Add this repository to HACS as a custom repository with category `Dashboard`.
 
 The HACS entry point is:
 
 ```text
-dist/ntp32s3-card.js
+dist/NTP32S3-Card.js
 ```
 
 ## Manual Resource
 
-If installing manually, copy `dist/ntp32s3-card.js` into Home Assistant under `www/community/ntp32s3-card/`, then add this Lovelace resource:
+If installing manually, copy `dist/NTP32S3-Card.js` into Home Assistant under `www/community/NTP32S3-Card/`, then add this Lovelace resource:
 
 ```yaml
-url: /local/community/ntp32s3-card/ntp32s3-card.js
+url: /local/community/NTP32S3-Card/NTP32S3-Card.js
 type: module
 ```
 
