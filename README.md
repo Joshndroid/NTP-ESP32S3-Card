@@ -1,6 +1,6 @@
 # NTP32S3 Cards
 
-Four HACS-compatible Lovelace cards for the ESP32-S3 GPS NTP server.
+Five HACS-compatible Lovelace cards for the ESP32-S3 GPS NTP server.
 
 The cards use Home Assistant card/theme variables with a restrained dark glass treatment.
 
@@ -12,6 +12,7 @@ The cards use Home Assistant card/theme variables with a restrained dark glass t
 | `ntp32s3-sky-card` | Satellite sky plot |
 | `ntp32s3-signal-card` | Satellite signal strength chart |
 | `ntp32s3-raw-card` | Raw-ish GNSS/NTP values including fix time and NTP packets |
+| `ntp32s3-health-card` | GPS stream health, SNR summary, constellation breakdown, and NMEA talkers |
 
 ## HACS
 
@@ -61,7 +62,7 @@ After installing or updating, hard-refresh Home Assistant. In the browser consol
 customElements.get("ntp32s3-dashboard-card") !== undefined
 ```
 
-And this should include the four NTP32S3 cards:
+And this should include the five NTP32S3 cards:
 
 ```js
 window.customCards?.filter((card) => card.type?.startsWith("ntp32s3"))
@@ -97,12 +98,18 @@ status_entity: sensor.ntp32s3_status
 name: NTP Server
 ```
 
+```yaml
+type: custom:ntp32s3-health-card
+status_entity: sensor.ntp32s3_status
+name: NTP Server
+```
+
 The `examples/` folder includes:
 
 | File | Purpose |
 | --- | --- |
 | `mqtt-status-sensor.yaml` | Optional fallback if you use MQTT instead of the NTP32S3 integration |
-| `three-card-stack.yaml` | Adds the dashboard, sky, signal, and raw cards as a vertical stack |
+| `three-card-stack.yaml` | Adds the dashboard, health, sky, signal, and raw cards as a vertical stack |
 
 You can also map individual entities:
 
@@ -117,10 +124,24 @@ entities:
   ntp_packets: sensor.ntp32s3_ntp_packets
   ntp_packets_today: sensor.ntp32s3_ntp_packets_today
   ntp_time: sensor.ntp32s3_ntp_time
+  gps_chars: sensor.ntp32s3_gps_characters
+  gps_passed_checksum: sensor.ntp32s3_gps_passed_checksums
+  gps_failed_checksum: sensor.ntp32s3_gps_failed_checksums
+  gps_checksum_failure_percent: sensor.ntp32s3_gps_checksum_failure
+  satellites_with_snr: sensor.ntp32s3_satellites_with_snr
+  average_snr: sensor.ntp32s3_average_snr
+  max_snr: sensor.ntp32s3_max_snr
   time_valid: binary_sensor.ntp32s3_gps_time_valid
   pps_active: binary_sensor.ntp32s3_pps_active
   mqtt_connected: binary_sensor.ntp32s3_mqtt_connected
 ```
+
+The health card works best when the status entity exposes these attributes from the current firmware/integration:
+
+- `gps_chars`, `gps_passed_checksum`, `gps_failed_checksum`, `gps_checksum_failure_percent`
+- `satellites_used`, `satellites_with_snr`, `average_snr`, `max_snr`
+- `satellites_by_constellation`, `satellites_used_by_constellation`
+- `nmea.talkers`
 
 ## Satellite Detail Data
 

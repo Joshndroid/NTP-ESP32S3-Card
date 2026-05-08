@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.4.0";
+const CARD_VERSION = "0.5.0";
 
 const DEFAULT_COLORS = {
   gps: "#2f8cff",
@@ -218,6 +218,28 @@ function autoEntities(hass, config) {
     ntpPacketsToday: configured.ntp_packets_today || findEntity(hass, ["sensor.ntp32s3_ntp_packets_today"]),
     ntpTime: configured.ntp_time || findEntity(hass, ["sensor.ntp32s3_ntp_time"]),
     unixTime: configured.unix_time || findEntity(hass, ["sensor.ntp32s3_unix_time"]),
+    gpsChars: configured.gps_chars || findEntity(hass, ["sensor.ntp32s3_gps_characters", "sensor.ntp32s3_gps_chars"]),
+    gpsPassedChecksum: configured.gps_passed_checksum || findEntity(hass, ["sensor.ntp32s3_gps_passed_checksums", "sensor.ntp32s3_gps_passed_checksum"]),
+    gpsFailedChecksum: configured.gps_failed_checksum || findEntity(hass, ["sensor.ntp32s3_gps_failed_checksums", "sensor.ntp32s3_gps_failed_checksum"]),
+    gpsChecksumFailurePercent: configured.gps_checksum_failure_percent || findEntity(hass, ["sensor.ntp32s3_gps_checksum_failure", "sensor.ntp32s3_gps_checksum_failure_percent"]),
+    nmeaTalkerGps: configured.nmea_talker_gps || findEntity(hass, ["sensor.ntp32s3_nmea_gps_talkers", "sensor.ntp32s3_nmea_talker_gps"]),
+    nmeaTalkerGlonass: configured.nmea_talker_glonass || findEntity(hass, ["sensor.ntp32s3_nmea_glonass_talkers", "sensor.ntp32s3_nmea_talker_glonass"]),
+    nmeaTalkerGalileo: configured.nmea_talker_galileo || findEntity(hass, ["sensor.ntp32s3_nmea_galileo_talkers", "sensor.ntp32s3_nmea_talker_galileo"]),
+    nmeaTalkerBeidou: configured.nmea_talker_beidou || findEntity(hass, ["sensor.ntp32s3_nmea_beidou_talkers", "sensor.ntp32s3_nmea_talker_beidou"]),
+    nmeaTalkerMixed: configured.nmea_talker_mixed || findEntity(hass, ["sensor.ntp32s3_nmea_mixed_talkers", "sensor.ntp32s3_nmea_talker_mixed"]),
+    satellitesWithSnr: configured.satellites_with_snr || findEntity(hass, ["sensor.ntp32s3_satellites_with_snr"]),
+    averageSnr: configured.average_snr || findEntity(hass, ["sensor.ntp32s3_average_snr"]),
+    maxSnr: configured.max_snr || findEntity(hass, ["sensor.ntp32s3_max_snr"]),
+    satellitesGps: configured.satellites_gps || findEntity(hass, ["sensor.ntp32s3_gps_satellites_detail", "sensor.ntp32s3_satellites_gps"]),
+    satellitesGlonass: configured.satellites_glonass || findEntity(hass, ["sensor.ntp32s3_glonass_satellites_detail", "sensor.ntp32s3_satellites_glonass"]),
+    satellitesGalileo: configured.satellites_galileo || findEntity(hass, ["sensor.ntp32s3_galileo_satellites_detail", "sensor.ntp32s3_satellites_galileo"]),
+    satellitesBeidou: configured.satellites_beidou || findEntity(hass, ["sensor.ntp32s3_beidou_satellites_detail", "sensor.ntp32s3_satellites_beidou"]),
+    satellitesSbas: configured.satellites_sbas || findEntity(hass, ["sensor.ntp32s3_sbas_satellites_detail", "sensor.ntp32s3_satellites_sbas"]),
+    satellitesUsedGps: configured.satellites_used_gps || findEntity(hass, ["sensor.ntp32s3_gps_satellites_used", "sensor.ntp32s3_satellites_used_gps"]),
+    satellitesUsedGlonass: configured.satellites_used_glonass || findEntity(hass, ["sensor.ntp32s3_glonass_satellites_used", "sensor.ntp32s3_satellites_used_glonass"]),
+    satellitesUsedGalileo: configured.satellites_used_galileo || findEntity(hass, ["sensor.ntp32s3_galileo_satellites_used", "sensor.ntp32s3_satellites_used_galileo"]),
+    satellitesUsedBeidou: configured.satellites_used_beidou || findEntity(hass, ["sensor.ntp32s3_beidou_satellites_used", "sensor.ntp32s3_satellites_used_beidou"]),
+    satellitesUsedSbas: configured.satellites_used_sbas || findEntity(hass, ["sensor.ntp32s3_sbas_satellites_used", "sensor.ntp32s3_satellites_used_sbas"]),
     timeValid: configured.time_valid || findEntity(hass, ["binary_sensor.ntp32s3_gps_time_valid"]),
     ppsActive: configured.pps_active || findEntity(hass, ["binary_sensor.ntp32s3_pps_active"]),
     mqttConnected: configured.mqtt_connected || findEntity(hass, ["binary_sensor.ntp32s3_mqtt_connected"]),
@@ -277,6 +299,11 @@ function formatDate(value) {
 function formatState(value, onText = "Active", offText = "Inactive") {
   if (value === undefined || value === null || value === "") return "-";
   return boolish(value) ? onText : offText;
+}
+
+function formatPercent(value, digits = 2) {
+  const parsed = numberish(value);
+  return parsed === undefined ? "-" : `${parsed.toLocaleString(undefined, { maximumFractionDigits: digits })}%`;
 }
 
 function localDayKey() {
@@ -355,6 +382,10 @@ function getStatus(hass, config) {
   };
   const fromEntity = (key) => entityValue(hass, entities[key]);
   const satellites = field("satellite_detail", "satellites_detail", "satellites_in_view", "satellites_view", "satellite_data");
+  const nmea = field("nmea") || {};
+  const talkers = typeof nmea === "object" && !Array.isArray(nmea) ? (nmea.talkers || {}) : {};
+  const byConstellation = field("satellites_by_constellation") || {};
+  const usedByConstellation = field("satellites_used_by_constellation") || {};
   return {
     raw: attrs,
     statusEntity: entities.status,
@@ -367,6 +398,35 @@ function getStatus(hass, config) {
     ntpPacketsToday: field("ntp_packets_today") ?? fromEntity("ntpPacketsToday"),
     satellitesUsed: field("satellites_used", "satellites") ?? fromEntity("satellites"),
     satelliteDetailCount: field("satellite_detail_count") ?? fromEntity("satelliteDetailCount"),
+    satellitesWithSnr: field("satellites_with_snr") ?? fromEntity("satellitesWithSnr"),
+    averageSnr: field("average_snr") ?? fromEntity("averageSnr"),
+    maxSnr: field("max_snr") ?? fromEntity("maxSnr"),
+    gpsChars: field("gps_chars") ?? fromEntity("gpsChars"),
+    gpsPassedChecksum: field("gps_passed_checksum") ?? fromEntity("gpsPassedChecksum"),
+    gpsFailedChecksum: field("gps_failed_checksum") ?? fromEntity("gpsFailedChecksum"),
+    gpsChecksumFailurePercent: field("gps_checksum_failure_percent") ?? fromEntity("gpsChecksumFailurePercent"),
+    nmeaCapability: typeof nmea === "object" && !Array.isArray(nmea) ? nmea.capability : undefined,
+    nmeaTalkers: {
+      gps: talkers.gps ?? fromEntity("nmeaTalkerGps"),
+      glonass: talkers.glonass ?? fromEntity("nmeaTalkerGlonass"),
+      galileo: talkers.galileo ?? fromEntity("nmeaTalkerGalileo"),
+      beidou: talkers.beidou ?? fromEntity("nmeaTalkerBeidou"),
+      mixed: talkers.mixed ?? fromEntity("nmeaTalkerMixed"),
+    },
+    satellitesByConstellation: {
+      gps: byConstellation.gps ?? fromEntity("satellitesGps"),
+      glonass: byConstellation.glonass ?? fromEntity("satellitesGlonass"),
+      galileo: byConstellation.galileo ?? fromEntity("satellitesGalileo"),
+      beidou: byConstellation.beidou ?? fromEntity("satellitesBeidou"),
+      sbas: byConstellation.sbas ?? fromEntity("satellitesSbas"),
+    },
+    satellitesUsedByConstellation: {
+      gps: usedByConstellation.gps ?? fromEntity("satellitesUsedGps"),
+      glonass: usedByConstellation.glonass ?? fromEntity("satellitesUsedGlonass"),
+      galileo: usedByConstellation.galileo ?? fromEntity("satellitesUsedGalileo"),
+      beidou: usedByConstellation.beidou ?? fromEntity("satellitesUsedBeidou"),
+      sbas: usedByConstellation.sbas ?? fromEntity("satellitesUsedSbas"),
+    },
     satellitesInView: field("satellites_in_view_count", "satellites_visible") ?? fromEntity("satellites_visible"),
     hdop: field("hdop") ?? fromEntity("hdop"),
     altitude: field("altitude_m", "altitude") ?? fromEntity("altitude"),
@@ -396,10 +456,27 @@ function normalizeSatellites(value) {
 }
 
 function satellitesByConstellation(status) {
+  const explicit = status.satellitesByConstellation || {};
+  const hasExplicit = Object.values(explicit).some((value) => numberish(value) !== undefined);
   const counts = { gps: 0, glonass: 0, galileo: 0, beidou: 0, sbas: 0, unknown: 0 };
+  if (hasExplicit) {
+    for (const key of Object.keys(counts)) counts[key] = numberish(explicit[key]) ?? 0;
+    return counts;
+  }
   for (const sat of status.satellites) counts[sat.constellation] = (counts[sat.constellation] || 0) + 1;
   if (!status.satellites.length && numberish(status.satellitesUsed) !== undefined) counts.gps = Number(status.satellitesUsed);
   return counts;
+}
+
+function constellationRows(status) {
+  const seen = satellitesByConstellation(status);
+  const used = status.satellitesUsedByConstellation || {};
+  return ["gps", "glonass", "galileo", "beidou", "sbas"].map((key) => ({
+    key,
+    label: CONSTELLATION_LABELS[key],
+    seen: numberish(seen[key]) ?? 0,
+    used: numberish(used[key]) ?? 0,
+  }));
 }
 
 function legend(status) {
@@ -690,6 +767,108 @@ class NtpRawCard extends NtpBaseCard {
   }
 }
 
+class NtpHealthCard extends NtpBaseCard {
+  static getStubConfig() {
+    return { name: "NTP Server" };
+  }
+
+  static getConfigElement() {
+    return document.createElement("ntp32s3-card-editor");
+  }
+
+  getCardSize() {
+    return 5;
+  }
+
+  render() {
+    if (!this.shadowRoot || !this._hass || !this.config) return;
+    const status = getStatus(this._hass, this.config);
+    const checksumFailure = numberish(status.gpsChecksumFailurePercent);
+    const checksumClass = checksumFailure === undefined ? "" : checksumFailure <= 1 ? "ok" : checksumFailure <= 5 ? "warn" : "bad";
+    const passed = numberish(status.gpsPassedChecksum) ?? 0;
+    const failed = numberish(status.gpsFailedChecksum) ?? 0;
+    const checksumTotal = passed + failed;
+    const failedWidth = checksumTotal > 0 ? Math.max(0, Math.min(100, failed / checksumTotal * 100)) : 0;
+    const avgSnr = numberish(status.averageSnr);
+    const maxSnr = numberish(status.maxSnr);
+    const rows = constellationRows(status);
+    const maxSeen = Math.max(1, ...rows.map((row) => row.seen));
+    const constellationMarkup = rows.map((row) => {
+      const seenWidth = Math.max(0, Math.min(100, row.seen / maxSeen * 100));
+      const usedWidth = row.seen > 0 ? Math.max(0, Math.min(100, row.used / row.seen * 100)) : 0;
+      return html`<div class="const-row">
+        <div class="const-label"><i style="background:${DEFAULT_COLORS[row.key]}"></i>${row.label}</div>
+        <div class="const-track">
+          <div class="const-seen" style="width:${seenWidth}%"></div>
+          <div class="const-used" style="width:${usedWidth}%;background:${DEFAULT_COLORS[row.key]}"></div>
+        </div>
+        <div class="const-count">${formatNumber(row.used, 0)} / ${formatNumber(row.seen, 0)}</div>
+      </div>`;
+    }).join("");
+    const talkers = status.nmeaTalkers || {};
+    this.shadowRoot.innerHTML = html`
+      <style>${BASE_STYLE}
+        .health-grid { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px; }
+        .metric.big { grid-column: span 2; }
+        .value.good { color: var(--ntp-good); }
+        .value.warn { color: var(--ntp-warn); }
+        .value.bad { color: var(--ntp-bad); }
+        .quality { margin-top: 12px; height: 10px; border-radius: 999px; overflow:hidden; background: color-mix(in srgb, var(--ntp-good) 28%, transparent); border:1px solid var(--ntp-glass-border-soft); }
+        .quality .fail { height:100%; margin-left:auto; background: var(--ntp-bad); min-width: ${failedWidth > 0 ? "2px" : "0"}; }
+        .split { display:grid; grid-template-columns: minmax(0, 1.15fr) minmax(190px, .85fr); gap:16px; margin-top:16px; }
+        .panel { border:1px solid var(--ntp-glass-border-soft); border-radius:12px; padding:13px; background: color-mix(in srgb, var(--ntp-glass-bg) 90%, var(--ntp-text) 10%); min-width:0; }
+        .panel-title { color:var(--ntp-muted); font-size:11px; font-weight:850; text-transform:uppercase; letter-spacing:.12em; margin-bottom:11px; }
+        .const-row { display:grid; grid-template-columns: 76px minmax(0,1fr) 48px; align-items:center; gap:10px; margin:9px 0; }
+        .const-label { display:flex; align-items:center; gap:7px; color:var(--ntp-muted); font-size:12px; font-weight:750; min-width:0; }
+        .const-label i { width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
+        .const-track { position:relative; height:12px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.06); border:1px solid var(--ntp-glass-border-soft); }
+        .const-seen { position:absolute; inset:0 auto 0 0; background:rgba(255,255,255,.10); }
+        .const-used { position:absolute; inset:0 auto 0 0; opacity:.95; }
+        .const-count { color:var(--ntp-text); text-align:right; font-size:12px; font-weight:800; }
+        .talkers { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px; }
+        .talker { min-width:0; }
+        .talker .raw-label { color:var(--ntp-muted); font-size:11px; font-weight:800; }
+        .talker .raw-value { margin-top:3px; color:var(--ntp-text); font-size:18px; font-weight:780; }
+        @media (max-width: 620px) {
+          .health-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .metric.big { grid-column: span 2; }
+          .split { grid-template-columns: 1fr; }
+        }
+      </style>
+      <ha-card>
+        <div class="wrap">
+          ${this.header(status, "Signal and GPS Health")}
+          <div class="health-grid">
+            <div class="metric big"><div class="label">Checksum Failure</div><div class="value ${checksumClass}">${formatPercent(status.gpsChecksumFailurePercent)}</div><div class="quality"><div class="fail" style="width:${failedWidth}%"></div></div></div>
+            <div class="metric"><div class="label">GPS Chars</div><div class="value">${formatNumber(status.gpsChars, 0)}</div></div>
+            <div class="metric"><div class="label">Sats Used</div><div class="value">${formatNumber(status.satellitesUsed, 0)}</div></div>
+            <div class="metric"><div class="label">Avg SNR</div><div class="value">${avgSnr === undefined ? "-" : formatNumber(avgSnr, 1)} <span class="unit">dBHz</span></div></div>
+            <div class="metric"><div class="label">Max SNR</div><div class="value">${maxSnr === undefined ? "-" : formatNumber(maxSnr, 1)} <span class="unit">dBHz</span></div></div>
+            <div class="metric"><div class="label">SNR Sats</div><div class="value">${formatNumber(status.satellitesWithSnr, 0)}</div></div>
+            <div class="metric"><div class="label">NMEA</div><div class="value">${escapeHtml(status.nmeaCapability || "-")}</div></div>
+          </div>
+          <div class="split">
+            <div class="panel">
+              <div class="panel-title">Constellations Used / Seen</div>
+              ${constellationMarkup}
+            </div>
+            <div class="panel">
+              <div class="panel-title">NMEA Talkers</div>
+              <div class="talkers">
+                <div class="talker"><div class="raw-label">GPS</div><div class="raw-value">${formatNumber(talkers.gps, 0)}</div></div>
+                <div class="talker"><div class="raw-label">GLONASS</div><div class="raw-value">${formatNumber(talkers.glonass, 0)}</div></div>
+                <div class="talker"><div class="raw-label">Galileo</div><div class="raw-value">${formatNumber(talkers.galileo, 0)}</div></div>
+                <div class="talker"><div class="raw-label">BeiDou</div><div class="raw-value">${formatNumber(talkers.beidou, 0)}</div></div>
+                <div class="talker"><div class="raw-label">Mixed</div><div class="raw-value">${formatNumber(talkers.mixed, 0)}</div></div>
+                <div class="talker"><div class="raw-label">Failed</div><div class="raw-value">${formatNumber(status.gpsFailedChecksum, 0)}</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ha-card>`;
+  }
+}
+
 class NtpCardEditor extends HTMLElement {
   setConfig(config) {
     this.config = config || {};
@@ -760,6 +939,9 @@ if (!customElements.get("ntp32s3-signal-card")) {
 if (!customElements.get("ntp32s3-raw-card")) {
   customElements.define("ntp32s3-raw-card", NtpRawCard);
 }
+if (!customElements.get("ntp32s3-health-card")) {
+  customElements.define("ntp32s3-health-card", NtpHealthCard);
+}
 if (!customElements.get("ntp32s3-card-editor")) {
   customElements.define("ntp32s3-card-editor", NtpCardEditor);
 }
@@ -789,6 +971,12 @@ const ntp32s3Cards = [
     name: "NTP32S3 Raw Data Card",
     preview: true,
     description: "Raw-ish GNSS/NTP values laid out like a receiver dashboard.",
+  },
+  {
+    type: "ntp32s3-health-card",
+    name: "NTP32S3 Health Card",
+    preview: true,
+    description: "GPS stream health, SNR summary, and constellation diagnostics.",
   },
 ];
 for (const card of ntp32s3Cards) {

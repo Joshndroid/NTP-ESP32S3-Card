@@ -3,6 +3,9 @@ cards:
   - type: custom:ntp32s3-dashboard-card
     name: NTP Server
 
+  - type: custom:ntp32s3-health-card
+    name: NTP Server
+
   - type: custom:ntp32s3-sky-card
     name: NTP Server
 
