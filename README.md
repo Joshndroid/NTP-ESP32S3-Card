@@ -54,6 +54,25 @@ status_entity: sensor.ntp32s3_status
 name: NTP Server
 ```
 
+The dashboard card shows the lock/waiting status pill by default. Supporting cards hide it by default to avoid repeating the same badge across a stack. You can override this per card:
+
+```yaml
+show_status_pill: true
+```
+
+Supporting cards also use their card role as the title by default, so a stack does not repeat `NTP Server` on every card. You can override the header text per card:
+
+```yaml
+header_title: Signal Health
+subheading: Roof receiver
+```
+
+Or hide the subheading entirely:
+
+```yaml
+hide_subheading: true
+```
+
 ## Troubleshooting
 
 After installing or updating, hard-refresh Home Assistant. In the browser console, this should return `true`:

@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.5.2";
+const CARD_VERSION = "0.5.5";
 
 const DEFAULT_COLORS = {
   gps: "#2f8cff",
@@ -301,6 +301,11 @@ function formatState(value, onText = "Active", offText = "Inactive") {
   return boolish(value) ? onText : offText;
 }
 
+function formatCapability(value) {
+  if (value === undefined || value === null || value === "") return "-";
+  return String(value).replaceAll("_", " ");
+}
+
 function formatPercent(value, digits = 2) {
   const parsed = numberish(value);
   return parsed === undefined ? "-" : `${parsed.toLocaleString(undefined, { maximumFractionDigits: digits })}%`;
@@ -539,12 +544,17 @@ class NtpBaseCard extends HTMLElement {
     return 4;
   }
 
-  header(status, subtitle) {
+  header(status, subtitle, options = {}) {
+    const showStatus = options.showStatus ?? this.config?.show_status_pill ?? false;
+    const title = this.config?.header_title ?? options.title ?? status.name;
+    const subtitleText = this.config?.hide_subheading
+      ? ""
+      : this.config?.subheading ?? options.subtitle ?? subtitle ?? "";
     if (!status.statusEntity && !this.config?.status_entity) {
       return html`<div class="header">
         <div>
-          <div class="title">${escapeHtml(this.config?.name || "NTP32S3")}</div>
-          <div class="subtitle">Waiting for NTP32S3 Status entity</div>
+          <div class="title">${escapeHtml(this.config?.header_title || this.config?.name || "NTP32S3")}</div>
+          ${this.config?.hide_subheading ? "" : html`<div class="subtitle">Waiting for NTP32S3 Status entity</div>`}
         </div>
         <div class="pill"><span class="dot"></span>No entity</div>
       </div>`;
@@ -553,10 +563,10 @@ class NtpBaseCard extends HTMLElement {
     const cls = valid ? "ok" : boolish(status.ppsActive) ? "warn" : "";
     return html`<div class="header">
       <div>
-        <div class="title">${escapeHtml(status.name)}</div>
-        <div class="subtitle">${escapeHtml(subtitle || status.ip || "GPS disciplined NTP")}</div>
+        <div class="title">${escapeHtml(title)}</div>
+        ${subtitleText ? html`<div class="subtitle">${escapeHtml(subtitleText)}</div>` : ""}
       </div>
-      <div class="pill ${cls}"><span class="dot"></span>${valid ? "Locked" : "Waiting"}</div>
+      ${showStatus ? html`<div class="pill ${cls}"><span class="dot"></span>${valid ? "Locked" : "Waiting"}</div>` : ""}
     </div>`;
   }
 }
@@ -589,7 +599,7 @@ class NtpDashboardCard extends NtpBaseCard {
       </style>
       <ha-card>
         <div class="wrap">
-          ${this.header(status, "Dashboard")}
+          ${this.header(status, "Dashboard", { showStatus: this.config.show_status_pill ?? true })}
           <div class="dashboard">
             <div>
               <div class="grid">
@@ -644,7 +654,7 @@ class NtpSkyCard extends NtpBaseCard {
       </style>
       <ha-card>
         <div class="wrap">
-          ${this.header(status, "Sky View")}
+          ${this.header(status, "", { title: "Sky View" })}
           ${status.satellites.length ? html`<div class="sky-wrap">${skySvg(status)}</div>${legend(status)}` : html`<div class="empty">Waiting for satellite detail data. The card will render the full sky plot when the MQTT status entity includes a satellite array.</div>${legend(status)}`}
         </div>
       </ha-card>`;
@@ -691,7 +701,7 @@ class NtpSignalCard extends NtpBaseCard {
       </style>
       <ha-card>
         <div class="wrap">
-          ${this.header(status, "Signal Strength")}
+          ${this.header(status, "", { title: "Signal Strength" })}
           ${sats.length ? html`<div class="chart" style="--sat-columns:${columnCount}">${bars}</div>${legend(status)}` : html`<div class="empty">Waiting for satellite signal detail. Add SNR/CN0 values to the status entity satellite array to populate the graph.</div>${legend(status)}`}
         </div>
       </ha-card>`;
@@ -741,7 +751,7 @@ class NtpRawCard extends NtpBaseCard {
       </style>
       <ha-card>
         <div class="wrap">
-          ${this.header(status, "Raw Data")}
+          ${this.header(status, "", { title: "Raw Data" })}
           <div class="raw-section">
             <div class="raw-title">Position</div>
             <div class="raw-grid">
@@ -808,8 +818,12 @@ class NtpHealthCard extends NtpBaseCard {
     const talkers = status.nmeaTalkers || {};
     this.shadowRoot.innerHTML = html`
       <style>${BASE_STYLE}
-        .health-grid { display:grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap:12px; }
+        .health-grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap:12px; }
         .metric.big { grid-column: span 2; }
+        .metric.capability { grid-column: 1 / -1; }
+        .metric.capability .value { font-size: 15px; line-height: 1.28; font-weight: 720; }
+        .health-grid .label { white-space: normal; line-height: 1.22; }
+        .health-grid .value { overflow: visible; text-overflow: clip; white-space: normal; overflow-wrap: anywhere; font-size: 17px; }
         .value.good { color: var(--ntp-good); }
         .value.warn { color: var(--ntp-warn); }
         .value.bad { color: var(--ntp-bad); }
@@ -830,7 +844,7 @@ class NtpHealthCard extends NtpBaseCard {
         .talker .raw-label { color:var(--ntp-muted); font-size:11px; font-weight:800; }
         .talker .raw-value { margin-top:3px; color:var(--ntp-text); font-size:18px; font-weight:780; }
         @media (max-width: 620px) {
-          .health-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+          .health-grid { grid-template-columns: repeat(2, minmax(118px, 1fr)); }
           .metric.big { grid-column: span 2; }
           .talkers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
           .const-row { grid-template-columns: 82px minmax(0, 1fr) 50px; gap:10px; }
@@ -841,7 +855,7 @@ class NtpHealthCard extends NtpBaseCard {
       </style>
       <ha-card>
         <div class="wrap">
-          ${this.header(status, "Signal and GPS Health")}
+          ${this.header(status, "", { title: "Signal and GPS Health" })}
           <div class="health-grid">
             <div class="metric big"><div class="label">Checksum Failure</div><div class="value ${checksumClass}">${formatPercent(status.gpsChecksumFailurePercent)}</div><div class="quality"><div class="fail" style="width:${failedWidth}%"></div></div></div>
             <div class="metric"><div class="label">GPS Chars</div><div class="value">${formatNumber(status.gpsChars, 0)}</div></div>
@@ -850,7 +864,7 @@ class NtpHealthCard extends NtpBaseCard {
             <div class="metric"><div class="label">Avg SNR</div><div class="value">${avgSnr === undefined ? "-" : formatNumber(avgSnr, 1)} <span class="unit">dBHz</span></div></div>
             <div class="metric"><div class="label">Max SNR</div><div class="value">${maxSnr === undefined ? "-" : formatNumber(maxSnr, 1)} <span class="unit">dBHz</span></div></div>
             <div class="metric"><div class="label">SNR Sats</div><div class="value">${formatNumber(status.satellitesWithSnr, 0)}</div></div>
-            <div class="metric"><div class="label">NMEA</div><div class="value">${escapeHtml(status.nmeaCapability || "-")}</div></div>
+            <div class="metric capability"><div class="label">NMEA Capability</div><div class="value">${escapeHtml(formatCapability(status.nmeaCapability))}</div></div>
           </div>
           <div class="split">
             <div class="panel">
