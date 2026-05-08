@@ -1,4 +1,4 @@
-const CARD_VERSION = "0.5.0";
+const CARD_VERSION = "0.5.2";
 
 const DEFAULT_COLORS = {
   gps: "#2f8cff",
@@ -815,24 +815,28 @@ class NtpHealthCard extends NtpBaseCard {
         .value.bad { color: var(--ntp-bad); }
         .quality { margin-top: 12px; height: 10px; border-radius: 999px; overflow:hidden; background: color-mix(in srgb, var(--ntp-good) 28%, transparent); border:1px solid var(--ntp-glass-border-soft); }
         .quality .fail { height:100%; margin-left:auto; background: var(--ntp-bad); min-width: ${failedWidth > 0 ? "2px" : "0"}; }
-        .split { display:grid; grid-template-columns: minmax(0, 1.15fr) minmax(190px, .85fr); gap:16px; margin-top:16px; }
+        .split { display:grid; grid-template-columns: 1fr; gap:16px; margin-top:16px; }
         .panel { border:1px solid var(--ntp-glass-border-soft); border-radius:12px; padding:13px; background: color-mix(in srgb, var(--ntp-glass-bg) 90%, var(--ntp-text) 10%); min-width:0; }
         .panel-title { color:var(--ntp-muted); font-size:11px; font-weight:850; text-transform:uppercase; letter-spacing:.12em; margin-bottom:11px; }
-        .const-row { display:grid; grid-template-columns: 76px minmax(0,1fr) 48px; align-items:center; gap:10px; margin:9px 0; }
+        .const-row { display:grid; grid-template-columns: 104px minmax(0,1fr) 58px; align-items:center; gap:12px; margin:10px 0; }
         .const-label { display:flex; align-items:center; gap:7px; color:var(--ntp-muted); font-size:12px; font-weight:750; min-width:0; }
         .const-label i { width:8px; height:8px; border-radius:50%; flex:0 0 auto; }
-        .const-track { position:relative; height:12px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.06); border:1px solid var(--ntp-glass-border-soft); }
+        .const-track { position:relative; height:14px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.06); border:1px solid var(--ntp-glass-border-soft); }
         .const-seen { position:absolute; inset:0 auto 0 0; background:rgba(255,255,255,.10); }
         .const-used { position:absolute; inset:0 auto 0 0; opacity:.95; }
         .const-count { color:var(--ntp-text); text-align:right; font-size:12px; font-weight:800; }
-        .talkers { display:grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap:10px; }
+        .talkers { display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:10px; }
         .talker { min-width:0; }
         .talker .raw-label { color:var(--ntp-muted); font-size:11px; font-weight:800; }
         .talker .raw-value { margin-top:3px; color:var(--ntp-text); font-size:18px; font-weight:780; }
         @media (max-width: 620px) {
           .health-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
           .metric.big { grid-column: span 2; }
-          .split { grid-template-columns: 1fr; }
+          .talkers { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+          .const-row { grid-template-columns: 82px minmax(0, 1fr) 50px; gap:10px; }
+        }
+        @media (max-width: 380px) {
+          .talkers { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
       </style>
       <ha-card>
@@ -841,7 +845,8 @@ class NtpHealthCard extends NtpBaseCard {
           <div class="health-grid">
             <div class="metric big"><div class="label">Checksum Failure</div><div class="value ${checksumClass}">${formatPercent(status.gpsChecksumFailurePercent)}</div><div class="quality"><div class="fail" style="width:${failedWidth}%"></div></div></div>
             <div class="metric"><div class="label">GPS Chars</div><div class="value">${formatNumber(status.gpsChars, 0)}</div></div>
-            <div class="metric"><div class="label">Sats Used</div><div class="value">${formatNumber(status.satellitesUsed, 0)}</div></div>
+            <div class="metric"><div class="label">Checks Passed</div><div class="value">${formatNumber(status.gpsPassedChecksum, 0)}</div></div>
+            <div class="metric"><div class="label">Checks Failed</div><div class="value">${formatNumber(status.gpsFailedChecksum, 0)}</div></div>
             <div class="metric"><div class="label">Avg SNR</div><div class="value">${avgSnr === undefined ? "-" : formatNumber(avgSnr, 1)} <span class="unit">dBHz</span></div></div>
             <div class="metric"><div class="label">Max SNR</div><div class="value">${maxSnr === undefined ? "-" : formatNumber(maxSnr, 1)} <span class="unit">dBHz</span></div></div>
             <div class="metric"><div class="label">SNR Sats</div><div class="value">${formatNumber(status.satellitesWithSnr, 0)}</div></div>
@@ -860,7 +865,6 @@ class NtpHealthCard extends NtpBaseCard {
                 <div class="talker"><div class="raw-label">Galileo</div><div class="raw-value">${formatNumber(talkers.galileo, 0)}</div></div>
                 <div class="talker"><div class="raw-label">BeiDou</div><div class="raw-value">${formatNumber(talkers.beidou, 0)}</div></div>
                 <div class="talker"><div class="raw-label">Mixed</div><div class="raw-value">${formatNumber(talkers.mixed, 0)}</div></div>
-                <div class="talker"><div class="raw-label">Failed</div><div class="raw-value">${formatNumber(status.gpsFailedChecksum, 0)}</div></div>
               </div>
             </div>
           </div>
