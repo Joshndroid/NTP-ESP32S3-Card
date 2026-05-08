@@ -374,11 +374,68 @@ function parseMaybeJson(value) {
   }
 }
 
+function storage() {
+  try {
+    return window.localStorage;
+  } catch (_err) {
+    return undefined;
+  }
+}
+
+function statusCacheKey(statusEntity, config) {
+  return `ntp32s3:last-status:${statusEntity || config.name || "default"}`;
+}
+
+function hasStatusPayload(attrs) {
+  return [
+    "time_valid",
+    "pps_active",
+    "ntp_packets",
+    "unix_time",
+    "satellite_detail",
+    "satellites",
+  ].some((key) => attrs[key] !== undefined);
+}
+
+function loadCachedStatus(statusEntity, config) {
+  const cache = storage();
+  if (!cache) return undefined;
+  try {
+    const value = JSON.parse(cache.getItem(statusCacheKey(statusEntity, config)) || "null");
+    return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+  } catch (_err) {
+    return undefined;
+  }
+}
+
+function saveCachedStatus(statusEntity, config, attrs) {
+  const cache = storage();
+  if (!cache || !hasStatusPayload(attrs)) return;
+  try {
+    cache.setItem(
+      statusCacheKey(statusEntity, config),
+      JSON.stringify({ ...attrs, cached_at: new Date().toISOString() }),
+    );
+  } catch (_err) {
+    // A full or disabled localStorage should not break the card render.
+  }
+}
+
 function getStatus(hass, config) {
   const entities = autoEntities(hass, config);
   const statusState = entities.status ? hass.states[entities.status] : undefined;
   const parsedState = parseMaybeJson(statusState?.state);
-  const attrs = { ...(statusState?.attributes || {}), ...(parsedState && !Array.isArray(parsedState) ? parsedState : {}) };
+  let attrs = { ...(statusState?.attributes || {}), ...(parsedState && !Array.isArray(parsedState) ? parsedState : {}) };
+  let stale = false;
+  if (hasStatusPayload(attrs)) {
+    saveCachedStatus(entities.status, config, attrs);
+  } else {
+    const cached = loadCachedStatus(entities.status, config);
+    if (cached) {
+      attrs = cached;
+      stale = true;
+    }
+  }
   const field = (...names) => {
     for (const name of names) {
       if (attrs[name] !== undefined) return attrs[name];
@@ -393,6 +450,11 @@ function getStatus(hass, config) {
   const usedByConstellation = field("satellites_used_by_constellation") || {};
   return {
     raw: attrs,
+    stale,
+    cachedAt: attrs.cached_at,
+    deviceOnline: field("device_online", "last_update_success"),
+    updateFailures: field("consecutive_update_failures"),
+    updateError: field("last_update_error"),
     statusEntity: entities.status,
     name: config.name || field("device_name", "friendly_name") || statusState?.attributes?.friendly_name || "NTP32S3",
     ip: field("ip", "ip_address") || fromEntity("ip"),
@@ -560,13 +622,15 @@ class NtpBaseCard extends HTMLElement {
       </div>`;
     }
     const valid = boolish(status.timeValid);
-    const cls = valid ? "ok" : boolish(status.ppsActive) ? "warn" : "";
+    const stale = status.stale || status.deviceOnline === false;
+    const cls = stale ? "warn" : valid ? "ok" : boolish(status.ppsActive) ? "warn" : "";
+    const text = stale ? "Last good" : valid ? "Locked" : "Waiting";
     return html`<div class="header">
       <div>
         <div class="title">${escapeHtml(title)}</div>
         ${subtitleText ? html`<div class="subtitle">${escapeHtml(subtitleText)}</div>` : ""}
       </div>
-      ${showStatus ? html`<div class="pill ${cls}"><span class="dot"></span>${valid ? "Locked" : "Waiting"}</div>` : ""}
+      ${showStatus ? html`<div class="pill ${cls}"><span class="dot"></span>${text}</div>` : ""}
     </div>`;
   }
 }
@@ -615,6 +679,7 @@ class NtpDashboardCard extends NtpBaseCard {
               <div class="footer">
                 <span class="pill ${boolish(status.ppsActive) ? "ok" : ""}"><span class="dot"></span>PPS ${boolish(status.ppsActive) ? "active" : "inactive"}</span>
                 <span class="pill ${boolish(status.mqttConnected) ? "ok" : ""}"><span class="dot"></span>MQTT ${boolish(status.mqttConnected) ? "online" : "offline"}</span>
+                ${status.stale || status.deviceOnline === false ? html`<span class="pill warn"><span class="dot"></span>stale data</span>` : ""}
               </div>
             </div>
             <div class="skybox">${skySvg(status, true)}</div>
